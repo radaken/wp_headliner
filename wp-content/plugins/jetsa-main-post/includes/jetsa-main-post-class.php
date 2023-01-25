@@ -1,6 +1,6 @@
 <?php
 /**
- * Adds Youtube_Subs widget.
+ * Добавляет виджет постов.
  */
  class Jetsa_Main_Post_Widget extends WP_Widget {
   
@@ -29,34 +29,64 @@
       if ( ! empty( $instance['title'] ) ) {
         echo $args['before_title'] . apply_filters( 'widget_title', $instance['title'] ) . $args['after_title'];
       }
+        // WP_Query arguments
+$args = array(
+    'post_type'              => array('post'), // use any for any kind of post type, custom post type slug for custom post type
+    'post_status'            => array('publish'), // Also support: pending, draft, auto-draft, future, private, inherit, trash, any
+    'posts_per_page'         => '1', // use -1 for all post
+    'order'                  => 'DESC', // Also support: ASC
+    'orderby'                => 'date', // Also support: none, rand, id, title, slug, modified, parent, menu_order, comment_count
+    'tax_query'              => array(
+        'relation' => 'AND', // Use AND for taking result on both condition true
+        array(
+            'taxonomy'         => 'category', // taxonomy slug
+            'terms'            => $instance['selected_category'],
+            'field'            => 'slug', // Also support: slug, name, term_taxonomy_id
+            'operator'         => 'IN', // Also support: AND, NOT IN, EXISTS, NOT EXISTS
+            'include_children' => true,
+        ),
+        array(
+            'taxonomy'         => 'category',// taxonomy slug
+            'terms'            => 'headliner',  // term ids
+            'field'            => 'slug', // Also support: slug, name, term_taxonomy_id
+            'operator'         => 'IN', // Also support: slug, name, term_taxonomy_id
+            'include_children' => true,
+        ),
+    ),
+);
 
-      $postParams = array(
-        'post_type' => 'post', // тип постов - записи
-        'category' => $instance['category'],
-        'numberposts' => 1, // получить 5 постов, можно также использовать posts_per_page
-        'orderby' => 'date', // сортировать по дате
-        'order' => 'DESC', // по убыванию (сначала - свежие посты)
-        'suppress_filters' => true // 'posts_*' и 'comment_feed_*' фильтры игнорируются
-      );
-      
-      $examplePost = get_posts($postParams);
-      
-      
+// The Query
+$query = new WP_Query($args);
 
-      // Widget Content Output
-      echo '<section class="headliner">
+// The Loop
+if ($query->have_posts()) {
+    while ($query->have_posts()) {
+        $query->the_post();
+        $postImgUrl = get_the_post_thumbnail_url(get_the_ID(), 'full');
+        $link = get_permalink(get_the_ID());
+        echo '<section class="headliner">
+<a class="headliner__box-link" href="'.$link.'">
       <div class="headliner__wrapper">
         <div class="headliner__wrapper-box">
-          <a>
-          <img src="'.get_the_post_thumbnail_url($examplePost).'">
           
-          <h1 class="title">'.$examplePost[0]->post_title.'</h1>
-          </a>
+          <img class="headliner__box-img" src="'.$postImgUrl.'">
+          
+          <h1 class="headliner__box-title">'.get_the_title() .'</h1>
+          
         </div>
       </div>
+      </a>
     </section>';
-    echo '************************************';
-    var_dump($examplePost);
+    }
+} else {
+    if ( is_admin() ){
+        echo '<pre>Это видно только администаторам: Не найдено хедлайнера. Проверьте категории (хоть одна запись с отмеченной категорией headliner 
+и хоть одна запись из <b>'.$instance['selected_category'].'</b><br> Если значение выше пусто или неверно, то поставьте его в настройках виджета</pre>';
+    }
+}
+
+// Restore original Post Data
+wp_reset_postdata();
 
       echo $args['after_widget']; // Whatever you want to display after widget (</div>, etc)
     }
@@ -70,45 +100,24 @@
      */
     public function form( $instance ) {
 
-      $category = ! empty( $instance['category'] ) ? $instance['category'] : esc_html__( 'football', 'jmp_domain' ); 
-
-      $enableStatus = ! empty( $instance['enableStatus'] ) ? $instance['enableStatus'] : esc_html__( 'default', 'jmp_domain' ); 
-  
+      $selected_category = ! empty( $instance['selected_category'] ) ? $instance['selected_category'] : esc_html__( 'football', 'jmp_domain' );
+      
       ?>
       
       
 
       <!-- Выбранная рубрика -->
       <p>
-        <label for="<?php echo esc_attr( $this->get_field_id( 'category' ) ); ?>">
+        <label for="<?php echo esc_attr( $this->get_field_id( 'selected_category' ) ); ?>">
           <?php esc_attr_e( 'Рубрика:', 'jmp_domain' ); ?>
         </label> 
 
         <input 
           class="widefat" 
-          id="<?php echo esc_attr( $this->get_field_id( 'category' ) ); ?>" 
-          name="<?php echo esc_attr( $this->get_field_name( 'category' ) ); ?>" 
+          id="<?php echo esc_attr( $this->get_field_id( 'selected_category' ) ); ?>"
+          name="<?php echo esc_attr( $this->get_field_name( 'selected_category' ) ); ?>"
           type="text" 
-          value="<?php echo esc_attr( $category ); ?>">
-      </p>
-
-      <!-- ON/OFF enableStatus -->
-      <p>
-        <label for="<?php echo esc_attr( $this->get_field_id( 'enableStatus' ) ); ?>">
-          <?php esc_attr_e( 'Статус: ', 'jmp_domain' ); ?>
-        </label> 
-
-        <select 
-          class="widefat" 
-          id="<?php echo esc_attr( $this->get_field_id( 'enableStatus' ) ); ?>" 
-          name="<?php echo esc_attr( $this->get_field_name( 'enableStatus' ) ); ?>">
-          <option value="off" <?php echo ($enableStatus == 'off') ? 'selected' : ''; ?>>
-            Выключено
-          </option>
-          <option value="on" <?php echo ($enableStatus == 'on') ? 'selected' : ''; ?>>
-            Включено
-          </option>
-        </select>
+          value="<?php echo esc_attr( $selected_category ); ?>">
       </p>
 
       <?php 
@@ -127,9 +136,7 @@
     public function update( $new_instance, $old_instance ) {
       $instance = array();
 
-      $instance['enableStatus'] = ( ! empty( $new_instance['enableStatus'] ) ) ? strip_tags( $new_instance['enableStatus'] ) : '';
-
-      $instance['category'] = ( ! empty( $new_instance['category'] ) ) ? strip_tags( $new_instance['category'] ) : '';
+      $instance['selected_category'] = ( ! empty( $new_instance['selected_category'] ) ) ? strip_tags( $new_instance['selected_category'] ) : '';
   
       return $instance;
     }
